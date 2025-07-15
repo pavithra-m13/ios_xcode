@@ -2,6 +2,7 @@
 **/.terraform/*
 !.terraform/modules
 !.terraform/providers
+.terraform/
 
 # Terraform state files
 *.tfstate

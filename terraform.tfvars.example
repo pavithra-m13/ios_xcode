@@ -1,0 +1,29 @@
+# terraform.tfvars.example
+# Copy this file to terraform.tfvars and update with your values
+
+# AWS Region
+aws_region = "us-east-1"
+
+# Email address for notifications (REQUIRED)
+email_address = "your-email@example.com"
+
+# Schedule for checking Xcode versions
+schedule_expression = "rate(1 day)"
+
+# Resource names (optional - defaults are provided)
+lambda_function_name = "xcode-version-checker"
+sns_topic_name       = "xcode-version-updates"
+ssm_parameter_name   = "/xcode/latest_version"
+
+# Lambda configuration
+lambda_timeout     = 60
+lambda_memory_size = 128
+log_retention_days = 14
+
+# Tags
+tags = {
+  Project     = "xcode-version-checker"
+  Environment = "production"
+  ManagedBy   = "terraform"
+  Owner       = "your-name"
+}

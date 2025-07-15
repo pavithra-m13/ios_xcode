@@ -1,0 +1,45 @@
+# Local .terraform directories
+**/.terraform/*
+!.terraform/modules
+!.terraform/providers
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Terraform plan output
+*.tfplan
+
+# Backup files
+*.backup
+*.bak
+
+# Sensitive variable files
+*.tfvars
+*.tfvars.json
+
+# Override files (local-only)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# .terraform.lock.hcl can be checked in, but if you want to ignore:
+# .terraform.lock.hcl
+
+# IDE/editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+*.log
+
+# System files
+Thumbs.db
+ehthumbs.db
+

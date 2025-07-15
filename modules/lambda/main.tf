@@ -47,7 +47,9 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Effect = "Allow"
         Action = [
           "ssm:GetParameter",
-          "ssm:PutParameter"
+          "ssm:PutParameter",
+          "ssm:SendCommand",
+          "ssm:GetCommandInvocation"
         ]
         Resource = "arn:aws:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${var.ssm_parameter_name}"
       },
@@ -98,8 +100,12 @@ resource "aws_lambda_function" "xcode_checker" {
       SSM_PARAMETER_NAME = var.ssm_parameter_name
       SCHEDULE_EXPRESSION = var.schedule_expression
       EMAIL_ADDRESS      = var.email_address
+      SSM_PARAM = var.ssm_parameter_name
+      S3_BUCKET = var.s3_bucket_name
+      MAC_INSTANCE_ID = var.mac_instance_id
     }
   }
+
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_basic_execution,

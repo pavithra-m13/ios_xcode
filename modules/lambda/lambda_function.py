@@ -5,14 +5,19 @@ import urllib.request
 import re
 from datetime import datetime
 
+# Environment variables
 SSM_PARAM = os.environ.get("SSM_PARAMETER_NAME", "/xcode/latest_version")
 REGION = os.environ.get("AWS_REGION")
 SNS_TOPIC_ARN = os.environ.get("SNS_TOPIC_ARN")
+S3_BUCKET = os.environ.get("S3_BUCKET_NAME")
+MAC_INSTANCE_ID = os.environ.get("MAC_INSTANCE_ID")
 SCHEDULE_EXPRESSION = os.environ.get("SCHEDULE_EXPRESSION", "rate(1 day)")
 EMAIL_ADDRESS = os.environ.get("EMAIL_ADDRESS", "")
 
+# AWS clients
 ssm = boto3.client("ssm", region_name=REGION)
 sns = boto3.client("sns", region_name=REGION) if SNS_TOPIC_ARN else None
+s3 = boto3.client("s3", region_name=REGION)
 
 def get_latest_xcode_version():
     """Fetch the latest Xcode version from xcodereleases.com"""
@@ -37,11 +42,10 @@ def get_latest_xcode_version():
             match = re.search(r'Xcode_([a-zA-Z0-9._-]+)\.xip', filename)
             if match:
                 version = match.group(1)
-                release_date = release.get("date", {}).get("year", "Unknown")
                 return {
                     "version": version,
                     "download_url": download_url,
-                    "release_date": release_date,
+                    "release_date": release.get("date", {}).get("year", "Unknown"),
                     "name": release.get("name", f"Xcode {version}")
                 }
         except KeyError:
@@ -68,6 +72,40 @@ def update_ssm_version(version):
         Description=f"Latest Xcode version - Updated on {datetime.utcnow().isoformat()}"
     )
 
+def check_s3_file_exists(version):
+    """Check if Xcode version already exists in S3"""
+    try:
+        s3.head_object(Bucket=S3_BUCKET, Key=f"xcode-{version}.xip")
+        return True
+    except:
+        return False
+
+def trigger_xcode_download(download_url, version):
+    """Trigger Xcode download on Mac instance via SSM Run Command"""
+    if not MAC_INSTANCE_ID:
+        print("No Mac instance configured for download")
+        return None
+    
+    try:
+        command = f'/usr/local/bin/download_xcode.sh "{download_url}" "{version}"'
+        
+        response = ssm.send_command(
+            InstanceIds=[MAC_INSTANCE_ID],
+            DocumentName="AWS-RunShellScript",
+            Parameters={
+                'commands': [command]
+            },
+            Comment=f"Download Xcode version {version}"
+        )
+        
+        command_id = response['Command']['CommandId']
+        print(f"Started download command: {command_id}")
+        return command_id
+        
+    except Exception as e:
+        print(f"Failed to trigger download: {str(e)}")
+        return None
+
 def send_notification(subject, message):
     """Send notification via SNS"""
     if sns and SNS_TOPIC_ARN:
@@ -81,40 +119,10 @@ def send_notification(subject, message):
         except Exception as e:
             print(f"Failed to send SNS notification: {e}")
 
-def send_setup_notification():
-    """Send initial setup notification"""
-    subject = "Xcode Version Checker - Setup Complete!"
-    message = f"""Xcode Version Checker Setup Complete!
-
-Your automated Xcode version checker has been successfully deployed and configured.
-
-Configuration:
-- Schedule: {SCHEDULE_EXPRESSION}
-- Email: {EMAIL_ADDRESS}
-- Region: {REGION}
-
-The system will now automatically:
-1. Check for new Xcode versions according to your schedule
-2. Send you email notifications when updates are available
-3. Track version history in AWS Systems Manager Parameter Store
-
-Important: Please confirm your email subscription by clicking the link in the confirmation email from AWS SNS.
-
-Your next version check will run according to the schedule, or you can trigger it manually from the AWS Lambda console.
-
-Happy coding!
-
-This notification was sent by your automated Xcode Version Checker."""
-    
-    send_notification(subject, message)
-
 def lambda_handler(event, context):
     """Main Lambda handler function"""
     try:
         print(f"Starting Xcode version check at {datetime.utcnow().isoformat()}")
-        print(f"Event received: {json.dumps(event)}")
-        
-        is_setup_trigger = event.get('setup_trigger', False)
         
         # Get latest Xcode version
         latest_info = get_latest_xcode_version()
@@ -124,27 +132,13 @@ def lambda_handler(event, context):
         print(f"Latest Xcode version: {latest_version}")
         print(f"Current stored version: {current_version}")
         
-        # Handle first run (initial setup)
+        # Handle first run
         if current_version is None:
-            print("First run detected - sending setup notification")
-            send_setup_notification()
             update_ssm_version(latest_version)
             return {
                 "statusCode": 200,
                 "status": "initial_setup",
-                "initial_version": latest_version,
-                "timestamp": datetime.utcnow().isoformat()
-            }
-        
-        # Handle manual setup trigger
-        if is_setup_trigger:
-            print("Manual setup trigger - sending setup notification")
-            send_setup_notification()
-            return {
-                "statusCode": 200,
-                "status": "setup_notification_sent",
-                "current_version": current_version,
-                "timestamp": datetime.utcnow().isoformat()
+                "initial_version": latest_version
             }
         
         # Check if update is needed
@@ -153,56 +147,64 @@ def lambda_handler(event, context):
             return {
                 "statusCode": 200,
                 "status": "no_update",
-                "current_version": current_version,
-                "timestamp": datetime.utcnow().isoformat()
+                "current_version": current_version
             }
         
         # New version detected
-        print(f"New version detected: {latest_version} (current: {current_version})")
+        print(f"New version detected: {latest_version}")
+        
+        # Check if already downloaded
+        if check_s3_file_exists(latest_version):
+            print(f"Version {latest_version} already exists in S3")
+            update_ssm_version(latest_version)
+            return {
+                "statusCode": 200,
+                "status": "already_downloaded",
+                "version": latest_version
+            }
+        
+        # Trigger download
+        command_id = trigger_xcode_download(latest_info["download_url"], latest_version)
+        
+        # Update SSM parameter
         update_ssm_version(latest_version)
         
-        # Send update notification
+        # Send notification
         subject = f"New Xcode Version Available: {latest_version}"
-        message = f"""New Xcode version detected!
+        message = f"""New Xcode version detected and download initiated!
 
 Previous Version: {current_version}
 New Version: {latest_version}
-Release Name: {latest_info.get('name', 'N/A')}
 Download URL: {latest_info['download_url']}
-Release Year: {latest_info['release_date']}
+S3 Location: s3://{S3_BUCKET}/xcode-{latest_version}.xip
+SSM Command ID: {command_id or 'N/A'}
 
-The SSM parameter '{SSM_PARAM}' has been updated automatically.
-
-You can download the new version from the Apple Developer portal or use the direct link above.
-
-Happy coding!
-
-This notification was sent by your automated Xcode Version Checker."""
+The download has been initiated on the Mac instance.
+You'll receive another notification once the download is complete.
+"""
         
         send_notification(subject, message)
         
         return {
             "statusCode": 200,
-            "status": "updated",
+            "status": "download_initiated",
             "previous_version": current_version,
             "new_version": latest_version,
-            "download_url": latest_info["download_url"],
-            "timestamp": datetime.utcnow().isoformat()
+            "s3_location": f"s3://{S3_BUCKET}/xcode-{latest_version}.xip",
+            "command_id": command_id
         }
         
     except Exception as e:
         error_msg = f"Error checking Xcode version: {str(e)}"
         print(error_msg)
         
-        # Send error notification
         send_notification(
             "Xcode Version Check Failed", 
-            f"{error_msg}\n\nTimestamp: {datetime.utcnow().isoformat()}\n\nPlease check the Lambda logs for more details."
+            f"{error_msg}\n\nTimestamp: {datetime.utcnow().isoformat()}"
         )
         
         return {
             "statusCode": 500,
             "status": "error",
-            "message": str(e),
-            "timestamp": datetime.utcnow().isoformat()
+            "message": str(e)
         }

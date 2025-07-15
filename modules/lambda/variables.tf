@@ -1,4 +1,4 @@
-# modules/lambda/variables.tf
+# modules/lambda/variables.tf - Updated
 variable "function_name" {
   description = "Name of the Lambda function"
   type        = string
@@ -21,6 +21,22 @@ variable "schedule_expression" {
 
 variable "email_address" {
   description = "Email address to receive notifications"
+  type        = string
+}
+
+# New variables for S3 and Mac instance
+variable "s3_bucket_name" {
+  description = "S3 bucket name for storing Xcode releases"
+  type        = string
+}
+
+variable "s3_bucket_arn" {
+  description = "S3 bucket ARN for IAM permissions"
+  type        = string
+}
+
+variable "mac_instance_id" {
+  description = "EC2 Mac instance ID for running download commands"
   type        = string
 }
 

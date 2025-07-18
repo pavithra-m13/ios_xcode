@@ -12,6 +12,14 @@ data "aws_ami" "mac_os" {
     values = ["x86_64"]
   }
 }
+resource "aws_ec2_host" "mac_host" {
+  availability_zone = var.availability_zone         
+  instance_type     = var.instance_type             
+  host_recovery     = "on"
+  auto_placement    = "on"
+
+  tags = var.tags
+}
 
 resource "aws_key_pair" "mac_instance" {
   key_name   = "${var.instance_name}-key"
@@ -101,11 +109,13 @@ resource "aws_iam_instance_profile" "mac_instance" {
 
 resource "aws_instance" "mac_instance" {
   ami                    = data.aws_ami.mac_os.id
-  instance_type          = var.instance_type
+  instance_type          = var.instance_type              
   key_name               = aws_key_pair.mac_instance.key_name
   vpc_security_group_ids = [aws_security_group.mac_instance.id]
   subnet_id              = var.subnet_id
   iam_instance_profile   = aws_iam_instance_profile.mac_instance.name
+  tenancy                = "host"                          # must be 'host' for macOS
+  host_id                = aws_ec2_host.mac_host.id        # assign dedicated host
 
   user_data = base64encode(templatefile("${path.module}/user_data.sh", {
     bucket_name = var.s3_bucket_name

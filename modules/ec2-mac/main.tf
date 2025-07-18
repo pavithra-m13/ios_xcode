@@ -92,6 +92,23 @@ resource "aws_iam_role_policy" "mac_instance" {
           "ssm:SendCommand"
         ]
         Resource = "*"
+      },
+       {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances",
+          "ec2:DescribeInstanceStatus"
+        ]
+        Resource = "*"
       }
     ]
   })

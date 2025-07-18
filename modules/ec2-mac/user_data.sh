@@ -1,9 +1,15 @@
 #!/bin/bash
 # modules/ec2-mac/user_data.sh
 
-# Install required tools
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+if ! command -v brew &> /dev/null; then
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+fi
+
+# Install AWS CLI
 brew install awscli
+
+# Install Xcode command line tools (required for xcrun)
+xcode-select --install || true
 
 # Create download script
 cat > /usr/local/bin/download_xcode.sh << 'EOF'

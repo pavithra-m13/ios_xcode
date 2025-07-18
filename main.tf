@@ -54,16 +54,18 @@ module "s3" {
 # EC2 Mac instance for downloading Xcode
 module "ec2_mac" {
   source = "./modules/ec2-mac"
-  
-  instance_name   = var.mac_instance_name
-  instance_type   = var.mac_instance_type
-  public_key      = var.public_key
-  vpc_id          = data.aws_vpc.default.id
-  subnet_id       = data.aws_subnets.default.ids[0]
-  s3_bucket_name  = module.s3.bucket_name
-  s3_bucket_arn   = module.s3.bucket_arn
-  tags            = var.tags
+
+  instance_name      = var.mac_instance_name
+  instance_type      = var.mac_instance_type              
+  public_key         = var.public_key
+  vpc_id             = data.aws_vpc.default.id
+  subnet_id          = data.aws_subnets.default.ids[0]
+  availability_zone  = data.aws_subnet.selected.availability_zone
+  s3_bucket_name     = module.s3.bucket_name
+  s3_bucket_arn      = module.s3.bucket_arn
+  tags               = var.tags
 }
+
 
 # SNS Topic and Subscription
 module "sns" {

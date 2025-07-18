@@ -1,3 +1,13 @@
+variable "availability_zone" {
+  description = "Availability zone to launch the Mac host and instance"
+  type        = string
+}
+
+variable "instance_type" {
+  description = "Mac instance type (e.g., mac1.metal or mac2.metal)"
+  type        = string
+}
+
 variable "instance_name" {
   description = "Name of the Mac instance"
   type        = string

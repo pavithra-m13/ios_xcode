@@ -8,9 +8,9 @@ data "aws_ami" "mac_os" {
   }
   
   filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
+  name   = "architecture"
+  values = ["arm64"]
+}
 }
 resource "aws_ec2_host" "mac_host" {
   availability_zone = var.availability_zone         
